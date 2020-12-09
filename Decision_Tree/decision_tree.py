@@ -4,7 +4,8 @@ import queue
 import copy
 import argparse
 import pandas as pd
-import draw_tree
+import Decision_Tree.draw_tree as draw_tree
+from Data_Loader.car_data_loader import datalabel, feature2id, id2feature, load_data
 import time
 
 class Node(object):
@@ -320,46 +321,34 @@ class DTreeCART(DTreeID3):
 def count_acc(gt_y, pred_y):
     return sum(gt_y==pred_y)/ len(pred_y)
     
-random.seed(112)
-np.random.seed(112)
-datalabel = np.array(["buying", "maint", "doors", "persons", "lug_boot", "safety", "values"])
-data_sets = pd.read_csv("car.data", delimiter=',', index_col=False, names=datalabel).to_numpy()
-np.random.shuffle(data_sets)
-feature2id = [{'vhigh': 0, 'high': 1, 'med': 2, 'low' : 3},
-                {'vhigh': 0, 'high': 1, 'med': 2, 'low' : 3},
-                {'2': 0, '3': 1, '4': 2, '5more': 3},
-                {'2': 0, '4': 1, 'more': 2},
-                {'small': 0, 'med': 1, 'big': 2},
-                {'low': 0, 'med': 1, 'high': 2},
-                {'unacc': 0, 'acc': 1, 'good': 2, 'vgood': 3}]         
-id2feature = [ {i: w for w, i in feature_list.items()} for feature_list in feature2id]
-parser = argparse.ArgumentParser(description='Decision Tree')
-parser.add_argument(
-        "--draw_trees",
-        action="store_true",
-        help="Whether to draw a decision tree with a small data set",
-    )
-parser.add_argument(
-        "--sample_name",
-        type=int, default=40,
-        help="How many data would like to use for drawing the trees",
-    )
-parser.add_argument(
-        "--alpha",
-        type=float, default=2.0,
-        help="weight factor for original prune",
-    )
-parser.add_argument(
-        "--train_test_frac",
-        type=float, default=0.8,
-        help="The data ratio of the training set to the test set",
-    )
-
-
-args = parser.parse_args()
-if __name__ == '__main__':
+if __name__ == '__main__':    
+    random.seed(112)
+    np.random.seed(112)
+    parser = argparse.ArgumentParser(description='Decision Tree')
+    parser.add_argument(
+            "--draw_trees",
+            action="store_true",
+            help="Whether to draw a decision tree with a small data set",
+        )
+    parser.add_argument(
+            "--sample_name",
+            type=int, default=40,
+            help="How many data would like to use for drawing the trees",
+        )
+    parser.add_argument(
+            "--alpha",
+            type=float, default=2.0,
+            help="weight factor for original prune",
+        )
+    parser.add_argument(
+            "--train_test_frac",
+            type=float, default=0.8,
+            help="The data ratio of the training set to the test set",
+        )
+    args = parser.parse_args()
     print(args)
     print(datalabel)
+    data_sets = load_data("/home/yangzhixian/ML/data/car.data", ',')
     row_, col_ = data_sets.shape
     if args.draw_trees:
         draw_row = args.sample_name

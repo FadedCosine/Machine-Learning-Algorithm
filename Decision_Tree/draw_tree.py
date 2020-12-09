@@ -4,8 +4,7 @@ import matplotlib.pyplot as plt
 decisionNode = dict(boxstyle="sawtooth", fc="0.8")
 leafNode = dict(boxstyle="round4", fc="0.8")
 arrow_args = dict(arrowstyle="<-")
-
-from decision_tree import datalabel as feature_names, id2feature as feature_x_names
+from Data_Loader.car_data_loader import datalabel as feature_names, id2feature as feature_x_names
 little_down = 0.03
 little_left = 0.03
 def getNumLeafs(TreeRoot):
