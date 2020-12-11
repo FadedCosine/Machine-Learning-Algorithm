@@ -71,10 +71,10 @@ class DTreeID3(object):
         self.label_num = None
       
 
-    def fit(self, X_train, Y_train, label_num):
+    def fit(self, X_train, Y_train, label_num, K=None):
         feature_ids = np.arange(X_train.shape[1])
         self.label_num = label_num
-        self._train(X_train, Y_train, self.tree, feature_ids)
+        self._train(X_train, Y_train, self.tree, feature_ids, K)
 
     def predict(self, X):
         n = X.shape[0]
@@ -84,7 +84,7 @@ class DTreeID3(object):
         return Y
 
     
-    def _train(self, X_train, Y_train, node, feature_ids):
+    def _train(self, X_train, Y_train, node, feature_ids, K=None):
         # 注意 X_train，也就yes样本在特征空间的取值， Y_train yes 样本的label
         # 计算当前结点的经验熵
         prob = self._cal_prob(Y_train)
@@ -245,10 +245,10 @@ class DTreeC45(DTreeID3):
 
 
 class DTreeCART(DTreeID3):
-    def _train(self, X_train, Y_train, node, feature_ids):
-        self._train_helper(X_train, Y_train, node, feature_ids)
+    def _train(self, X_train, Y_train, node, feature_ids, K=None):
+        self._train_helper(X_train, Y_train, node, feature_ids, K)
 
-    def _train_helper(self, X_train, Y_train, node, feature_ids):
+    def _train_helper(self, X_train, Y_train, node, feature_ids, K=None):
         # 1. 结束条件：若 D 中所有实例属于同一类，决策树成单节点树，直接返回
         if np.any(np.bincount(Y_train) == len(Y_train)):
             node.y = Y_train[0]
@@ -258,7 +258,10 @@ class DTreeCART(DTreeID3):
             node.y = np.argmax(np.bincount(Y_train))
             return
         # 3. 与 ID3, C4.5 不一样, 不仅要确定最优切分特征，还要确定最优切分值
-        max_info_gain, g, v, left_idx, right_idx = self._feature_choose_standard(X_train, Y_train)
+        if K is None:
+            max_info_gain, g, v, left_idx, right_idx = self._feature_choose_standard(X_train, Y_train)
+        else:
+            max_info_gain, g, v, left_idx, right_idx = self._feature_choose_standard_randk(X_train, Y_train, K)
         # 即可能存在特征一样，但label不同的数据，此时max_info_gain为None
         if max_info_gain is None:
             node.y = np.argmax(np.bincount(Y_train))
@@ -280,13 +283,13 @@ class DTreeCART(DTreeID3):
       
         # left_idx 和 right_idx 分别表示根据最优划分点 分割出的左右子树的数据集
         idx_list = left_idx, right_idx
-        for k, row_idx in enumerate(idx_list):
+        for child_idx, row_idx in enumerate(idx_list):
             row_idx = row_idx.T[0].T
             # 因为CARTyes二分，而这里的k的取值也yes0、1，1表示no，0表示yes
-            child = Node(node, pre_split_feature_x=k) #, "yes" if k == 0 else 'no')
+            child = Node(node, pre_split_feature_x=child_idx) #, "yes" if k == 0 else 'no')
             node.append(child)
             X_train_child, Y_train_child = X_train[row_idx, :], Y_train[row_idx]
-            self._train_helper(X_train_child, Y_train_child, child, feature_ids)
+            self._train_helper(X_train_child, Y_train_child, child, feature_ids, K)
 
     def _feature_choose_standard(self, X_train, Y_train):
         row, col = X_train.shape
@@ -310,7 +313,31 @@ class DTreeCART(DTreeID3):
                         min_gini, g, v, left_idx, right_idx = gini_DA, j, k, left_row_idxs, right_row_idxs
 
         return min_gini, g, v, left_idx, right_idx
-    
+    def _feature_choose_standard_randk(self, X_train, Y_train, K):
+        row, col = X_train.shape
+        min_gini, g, v, left_idx, right_idx = None, None, None, None, None
+        for j in range(col):
+            a_cls = np.bincount(X_train[:, j]) # [j]特征在整个数据集中不同的取值
+            # 与 ID3, C4.5 不一样,不仅要确定最优切分特征，还要确定最优切分值
+            sample_feature_idx = np.random.permutation(len(a_cls))[:int(len(a_cls) * K)]
+            for cur_feature in sample_feature_idx:
+                left_row_idxs, right_row_idxs = np.argwhere(X_train[:, j] == cur_feature), np.argwhere(X_train[:, j] != cur_feature)
+                # 根据切分值划为两类，且必须要化成了两类
+                if len(left_row_idxs) != 0 and len(right_row_idxs) != 0:
+                # H(D) = -SUM(p_i * log(p_i))
+                    left_prob, right_prob = self._cal_prob(Y_train[left_row_idxs].T[0]), self._cal_prob(Y_train[right_row_idxs].T[0])
+                    left_gini, right_gini = 1 - np.sum(left_prob * left_prob), 1 - np.sum(right_prob * right_prob)
+                    # H(D|A)=SUM(p_i * H(D|A=a_i))
+                    
+                    gini_DA = a_cls[cur_feature] / np.sum(a_cls) * left_gini + (1 - a_cls[cur_feature] / np.sum(a_cls)) * right_gini
+                    # if gini_DA == 0.0:
+
+                    if min_gini is None or min_gini > gini_DA:
+                        min_gini, g, v, left_idx, right_idx = gini_DA, j, cur_feature, left_row_idxs, right_row_idxs
+
+        return min_gini, g, v, left_idx, right_idx
+        
+
     def predict(self, X):
         n = X.shape[0]
         Y = np.zeros(n)
