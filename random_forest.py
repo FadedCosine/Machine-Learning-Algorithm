@@ -76,7 +76,7 @@ if __name__ == '__main__':
 
     print(args)
     print(datalabel)
-    data_sets = load_data("/home/yangzhixian/ML/data/car.data", ',')
+    data_sets = load_data("./data/car.data", ',')
     row_, col_ = data_sets.shape
 
     train_test_frac = args.train_test_frac
