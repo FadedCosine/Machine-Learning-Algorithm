@@ -320,6 +320,7 @@ class DTreeCART(DTreeID3):
             a_cls = np.bincount(X_train[:, j]) # [j]特征在整个数据集中不同的取值
             # 与 ID3, C4.5 不一样,不仅要确定最优切分特征，还要确定最优切分值
             sample_feature_idx = np.random.permutation(len(a_cls))[:int(len(a_cls) * K)]
+            # sample_feature_idx = list(range(len(a_cls)))[:int(len(a_cls) * K)]
             for cur_feature in sample_feature_idx:
                 left_row_idxs, right_row_idxs = np.argwhere(X_train[:, j] == cur_feature), np.argwhere(X_train[:, j] != cur_feature)
                 # 根据切分值划为两类，且必须要化成了两类

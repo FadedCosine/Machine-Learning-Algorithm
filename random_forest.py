@@ -4,7 +4,7 @@ import copy
 import random
 import argparse
 import pandas as pd
-
+import math
 from Data_Loader.car_data_loader import datalabel, feature2id, id2feature, load_data
 
 class RandomForest(object):
@@ -14,8 +14,10 @@ class RandomForest(object):
         self.tree_model_list = []
         self.model_count = model_count
 
-    def fit(self, X_train, Y_train, label_num, K=0.5, rate=0.632):
+    def fit(self, X_train, Y_train, label_num, K=None, rate=0.632):
         # Generate decision tree
+        if K is None:
+            K = math.log(X_train.shape[1], 2)
         for i in range(self.model_count):
             tree_model = copy.deepcopy(self.tree_model)
             n, m = X_train.shape
@@ -54,16 +56,22 @@ if __name__ == '__main__':
             help="How many data would like to use for drawing the trees",
         )
     parser.add_argument(
-            "--alpha",
-            type=float, default=2.0,
-            help="weight factor for original prune",
-        )
-    parser.add_argument(
             "--train_test_frac",
-            type=float, default=0.8,
+            type=float, default=0.7,
             help="The data ratio of the training set to the test set",
         )
-
+    parser.add_argument(
+            "--rate",
+            type=float, default=0.632,
+            help="sampling data number rate",
+        )
+    
+    parser.add_argument(
+            "--K",
+            type=float, default=None,
+            help="random feature rate",
+        )
+    
     args = parser.parse_args()
 
     print(args)
@@ -85,7 +93,7 @@ if __name__ == '__main__':
 
     tree_model = decision_tree.DTreeCART()
     rf_model = RandomForest(tree_model)
-    rf_model.fit(train_X_t, train_Y_t, len(feature2id[-1].values()))
+    rf_model.fit(train_X_t, train_Y_t, len(feature2id[-1].values()), args.K, args.rate)
     rf_pred_y = rf_model.predict(test_X_t)
     print("RandomForest model in Test set acc : ", count_acc(test_Y_t, rf_pred_y))
 

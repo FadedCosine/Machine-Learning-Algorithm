@@ -5,7 +5,20 @@ import random
 import argparse
 import pandas as pd
 from Data_Loader.car_data_loader import datalabel, feature2id, id2feature, load_data
-
+from sklearn.neural_network import MLPClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.gaussian_process import GaussianProcessClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
+from sklearn.gaussian_process.kernels import RBF
+import logging
+logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
+                    datefmt='%d-%m-%Y:%H:%M:%S')
+logging.getLogger().setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
 class Bagging(object):
 
     def __init__(self, base_model, model_count=10):
@@ -13,7 +26,7 @@ class Bagging(object):
         self.base_model_list = []
         self.model_count = model_count
 
-    def fit(self, X_train, Y_train, label_num, rate=0.632):
+    def fit(self, X_train, Y_train, label_num=None, rate=0.632):
         # Generate decision tree
         for i in range(self.model_count):
             base_model = copy.deepcopy(self.base_model)
@@ -22,9 +35,12 @@ class Bagging(object):
             sample_idx = np.random.permutation(n)[:int(n * rate)]
             X_t_, Y_t_ = X_train[sample_idx, :], Y_train[sample_idx]
             # Train
-            base_model.fit(X_t_, Y_t_, label_num)
+            if label_num is None:
+                base_model.fit(X_t_, Y_t_)
+            else:
+                base_model.fit(X_t_, Y_t_, label_num)
             self.base_model_list.append(base_model)
-            print('=' * 10 + ' %r/%r base model trained ' % (i + 1, self.model_count) + '=' * 10)
+            logger.info('=' * 10 + ' %r/%r base model trained ' % (i + 1, self.model_count) + '=' * 10)
             # print(dt_CART.visualization())
 
     def predict(self, X):
@@ -54,27 +70,28 @@ if __name__ == '__main__':
             help="How many data would like to use for drawing the trees",
         )
     parser.add_argument(
-            "--alpha",
-            type=float, default=2.0,
-            help="weight factor for original prune",
-        )
-    parser.add_argument(
             "--train_test_frac",
-            type=float, default=0.8,
+            type=float, default=0.5,
             help="The data ratio of the training set to the test set",
         )
+    parser.add_argument(
+            "--rate",
+            type=float, default=0.632,
+            help="sampling data num",
+        )
+    
 
     args = parser.parse_args()
 
-    print(args)
-    print(datalabel)
+    logger.info(args)
+    logger.info(datalabel)
     data_sets = load_data("/home/yangzhixian/ML/data/car.data", ',')
     row_, col_ = data_sets.shape
 
     train_test_frac = args.train_test_frac
     train_row = int(row_ * train_test_frac)
-    print("train row is :", train_row)
-    print("test row is :", row_ - train_row)
+    logger.info("train row is : {}".format(train_row))
+    logger.info("test row is : {}".format(row_ - train_row))
     train_sets = data_sets[:train_row, :]
     test_sets = data_sets[train_row : , :]
     train_sets_encode = np.array([[feature2id[j][train_sets[i, j]] for j in range(col_)] for i in range(train_row)])
@@ -87,9 +104,34 @@ if __name__ == '__main__':
     Bagging_model = Bagging(base_model)
     Bagging_model.fit(train_X_t, train_Y_t, len(feature2id[-1].values()))
     Bagging_pred_y = Bagging_model.predict(test_X_t)
-    print("Bagging model in Test set acc : ", count_acc(test_Y_t, Bagging_pred_y))
+    logger.info("Bagging model in Test set acc : {}".format(count_acc(test_Y_t, Bagging_pred_y)))
 
     CART_model = decision_tree.DTreeCART()
     CART_model.fit(train_X_t, train_Y_t, len(feature2id[-1].values()))
     CART_pred_y = CART_model.predict(test_X_t).astype(int)
-    print("CART Test set acc : ", count_acc(test_Y_t, CART_pred_y))
+    logger.info("CART Test set acc : {}".format(count_acc(test_Y_t, CART_pred_y)))
+
+    
+    classifiers = [
+        KNeighborsClassifier(3),
+        SVC(kernel="linear", C=0.025),
+        SVC(gamma=2, C=1),
+        GaussianProcessClassifier(1.0 * RBF(1.0)),
+     
+        MLPClassifier(alpha=1, max_iter=1000),
+        AdaBoostClassifier(),
+        GaussianNB()
+    ]
+    names = ["Nearest Neighbors", "Linear SVM", "RBF SVM", "Gaussian Process",
+         "Neural Net", "AdaBoost",
+         "Naive Bayes"]
+    classifier = MLPClassifier(alpha=1, max_iter=1000)
+    for name, clf in zip(names, classifiers):
+        Bagging_model = Bagging(clf)
+        Bagging_model.fit(train_X_t, train_Y_t, rate=args.rate)
+        Bagging_pred_y = Bagging_model.predict(test_X_t)
+        logger.info("Bagging model in Test set acc : {}".format(count_acc(test_Y_t, Bagging_pred_y)))
+        clf.fit(train_X_t, train_Y_t)
+        svm_pred_y = clf.predict(test_X_t)
+        logger.info("{} in Test set acc : {}".format(name, count_acc(test_Y_t, svm_pred_y)))
+    
