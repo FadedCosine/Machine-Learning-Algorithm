@@ -44,7 +44,7 @@ def count_acc(gt_y, pred_y):
 if __name__ == '__main__':    
     random.seed(112)
     np.random.seed(112)
-    parser = argparse.ArgumentParser(description='Decision Tree')
+    parser = argparse.ArgumentParser(description='Random Forest')
     parser.add_argument(
             "--draw_trees",
             action="store_true",
