@@ -6,9 +6,42 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn import metrics
 from sklearn import cluster, datasets, mixture
+from sklearn.utils import check_X_y, _safe_indexing
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import pairwise_distances
 from sklearn.neighbors import kneighbors_graph
 from sklearn.preprocessing import StandardScaler
 from itertools import cycle, islice
+
+def check_number_of_labels(n_labels, n_samples):
+    """Check that number of labels are valid.
+
+    Parameters
+    ----------
+    n_labels : int
+        Number of labels
+
+    n_samples : int
+        Number of samples
+    """
+    if not 1 < n_labels < n_samples:
+        raise ValueError("Number of labels is %d. Valid values are 2 "
+                         "to n_samples - 1 (inclusive)" % n_labels)
+def count_avg_diam(X, labels):
+    X, labels = check_X_y(X, labels)
+    le = LabelEncoder()
+    labels = le.fit_transform(labels)
+    n_samples, _ = X.shape
+    n_labels = len(le.classes_)
+    check_number_of_labels(n_labels, n_samples)
+
+    avg_diam = 0.
+    for k in range(n_labels):
+        cluster_k = _safe_indexing(X, labels == k)
+        avg_diam += np.max(pairwise_distances(cluster_k))
+    return avg_diam / n_labels
+
+
 
 np.random.seed(0)
 
@@ -18,7 +51,7 @@ np.random.seed(0)
 n_samples = 750
 noisy_circles = datasets.make_circles(n_samples=n_samples, factor=.5,
                                       noise=.05)
-centers = [[1, 1], [-1, -1], [1, -1]]
+centers = [[1, 1], [-1, 1],  [-1, -1], [1, -1]]
 blobs = datasets.make_blobs(n_samples=n_samples, centers=centers, cluster_std=0.4, random_state=0)
 no_structure = np.random.rand(n_samples, 2), None
 # ============
@@ -31,8 +64,8 @@ default_base = {'quantile': .3,
                 'damping': .9,
                 'preference': -200,
                 'n_neighbors': 10,
-                'n_clusters': 3,
-                'min_samples': 10,
+                'n_clusters': 4,
+                'min_samples': 15,
                 'xi': 0.05,
                 'min_cluster_size': 0.1}
 
@@ -40,7 +73,7 @@ datasets = [
     ("noisy_circles", noisy_circles, {'damping': .77, 'preference': -240,
                      'quantile': .2, 'n_clusters': 2,
                       'xi': 0.25}),
-    ("blobs",blobs, {}),
+    ("blobs",blobs, {'n_clusters': 2}),
     ]
 
 for i_dataset, (dataset_name, dataset, algo_params) in enumerate(datasets):
@@ -91,7 +124,10 @@ for i_dataset, (dataset_name, dataset, algo_params) in enumerate(datasets):
             % metrics.adjusted_mutual_info_score(labels_true, labels))
         print("Silhouette Coefficient: %0.3f"
             % metrics.silhouette_score(X, labels))
-
+        print("Davies-Bouldin Index:  %0.3f"
+            % metrics.davies_bouldin_score(X, labels))
+        
+        print(count_avg_diam(X, labels))
         # Black removed and is used for noise instead.
         unique_labels = set(labels)
         colors = [plt.cm.Spectral(each)
